@@ -1,0 +1,271 @@
+
+
+
+
+* Basic premise
+
+
+The Tech trolley will be going through a pipe at 100m/s under low pressure. There are two main situations to consider with regards to simulating airflow - the transition from a full stop to cruising speed (taking trnasient flows into special consideration), and at cruising speed (steady state simulation for the most part.)
+
+* Solver
+
+Given that our vehicle is moving through a fully enclosed tube with compressible gas, sonicFoam & sonicDyFoam seems to be suitable solvers for our simulations. More information can be found at https://www.openfoam.com/documentation/cpp-guide/html/group__grpCompressibleSolvers.html.
+
+
+
+* Track
+** Track Specifications
+The track specifications are listed in Page 3 under the title Structural. A brief summary is listed below.
+
+#+BEGIN_SRC txt
+# Pipe Dimensions
+Inner Diameter : 70.6 in
+Length         : 4150 ft(1.25 km)
+
+# Track Foundation 
+Concrete Height    : 10.4 in
+Subtrack Thickness : 0.5 in
+
+#Pressure & Temperature
+Internal Pressure  : 0.125 - 4.7 psi
+
+# Keep out Zone
+Ceiling height : 6 in
+#+END_SRC
+
+Drawing spec is listed at Page 5 of Track Specification.
+
+We'll be creating the mesh of the track using blockMesh. We'll ignore the part of the track covered by foundation and for simplicity, ignore the aluminum rails. The keep out zone seem to consist of lights running down the length of the tube and will be ignored for simplicity.
+
+*** BlockMeshDict file
+#+BEGIN_src m4 
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  4.x                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+
+m4_divert(-1)
+#----------------------------------
+m4_changecom(//)m4_changequote([,])
+m4_define(calc, [m4_esyscmd(perl -e 'printf ($1)')])
+m4_define(pi, 3.14159265358979323844)
+m4_define(rad, [calc($1*pi/180.0)])
+#----------------------------------
+
+#----------------------------------
+# (convertToMeters)
+m4_define(units, 1)
+
+# Data points of Hyperloop track
+# User defined values
+m4_define(foundationDepth,         25)        # Distance of foundation from origin
+m4_define(foundationWidth,         50)        # Width of the foundation 
+m4_define(ceilingDepth,             6)        # Distance of ceiling depth from top
+m4_define(ceilingY,              29.3)
+m4_define(pipeDiameter,          70.6)
+m4_define(pipeLength,            4150)
+m4_define(cornerStretch,         0.77)
+m4_define(arcStretch,            1.07)
+
+# *********** Calculated ************
+
+# General 
+m4_define(pipeRadius, calc(pipeDiameter/2))
+m4_define(topMost,    calc( 0,          pipeRadius, 0))
+m4_define(rightMost,  calc( pipeRadius, 0         , 0))
+m4_define(leftMost,   calc(-pipeRadius, 0         , 0))
+       # Mirrored
+m4_define(topMost,    calc( 0,          pipeRadius, 0))
+m4_define(rightMost,  calc( pipeRadius, 0         , 0))
+m4_define(leftMost,   calc(-pipeRadius, 0         , 0))
+
+# Foundation        
+m4_define(foundationY, calc(-foundationDepth))    
+m4_define(foundationX, calc(pipeRadius  - (foundationWidth/2))) 
+
+# Ceiling
+m4_define(ceilingHeight, calc(pipeRadius - ceilingDepth)                           )
+m4_define(ceilingX     , calc((pipeRadius*2 - (pipeRadius - ceilingDepth)*2)^(0.5)))
+m4_define(ceilingY     , calc(ceilingHeight)                                       )
+
+
+m4_divert(0)
+convertToMeters 1;
+
+vertices
+(
+    (foundationX foundationY   trackStart)     # vertex 0 # foundation right most extent
+    (0           foundationY   trackStart)     # vertex 1 # foundation intersects with y axis
+    (0           pipeRadius    trackStart)     # vertex 2 # top of ceiling
+
+    # Mirrored for track end
+
+    (foundationX foundationY   trackEnd)     # vertex 3 # foundation right most extent
+    (0           foundationY   trackEnd)     # vertex 4 # foundation intersects with y axis
+    (0           pipeRadius    trackEnd)     # vertex 5 # top of ceiling
+);
+
+
+edges
+(
+# one edge is curved and represents the pipe that is curved without ceiling keep out zone
+arc 0 2 rightMost
+arc 3 5 rightMost'
+);
+
+
+blocks
+(
+    hex (0 1 2 2 3 4 5 5) # vertex numbers 
+    (10 10 10)            # numbers of cells in each direction 
+    simpleGrading (1 1 1)
+);
+
+
+boundary                
+( 
+    inlet              # patch name 
+    { 
+        type patch;    # patch type for patch 0 
+        faces 
+        ( 
+            (0 1 2 2)  # block face in this patch 
+        ); 
+    }                  # end of 0th patch definition 
+    outlet             # patch name 
+    { 
+        type patch;    # patch type for patch 1 
+        faces 
+        ( 
+            (3 4 5 5) 
+        ); 
+    } 
+    walls 
+    { 
+        type wall; 
+        faces 
+        ( 
+            (0 3 2 5)         # Curved surface
+            (2 5 1 4)         # Plane of symmetry
+            (1 0 3 4)         # Foundation
+        ); 
+    } 
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //
+#+END_src
+
+
+** Aluminum Rail
+
+
+
+
+
+
+* Shit. Pure unadulterted shit
+
+
+
+*** BlockMeshDict file
+#+BEGIN_src C :tangle BlockMeshDict 
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  4.x                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+convertToMeters 1;
+
+vertices
+(
+    (10.30       -25     0)    
+    (0           -25     0)     
+    (0           30.6    0)     
+
+    (10.30       -25     4160)     
+    (0           -25     4160)     
+    (0           30.6    4160)     
+);
+
+
+edges
+(
+arc 0 2 ( 35.30, 0 , 4150)
+arc 3 5 ( 35.30, 0 , 4150)
+);
+
+
+blocks
+(
+    hex (0 1 2 2 3 4 5 5) 
+    (10 10 10)            
+    simpleGrading (1 1 1)
+);
+
+
+boundary                
+( 
+    inlet              
+    { 
+        type patch;    
+        faces 
+        ( 
+            (0 1 2 2)  
+        ); 
+    }                  
+    outlet             
+    { 
+        type patch;    
+        faces 
+        ( 
+            (3 4 5 5) 
+        ); 
+    } 
+    walls 
+    { 
+        type wall; 
+        faces 
+        ( 
+            (0 3 2 5)         
+            (2 5 1 4)        
+            (1 0 3 4)       
+        ); 
+    } 
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //
+#+END_src
+
