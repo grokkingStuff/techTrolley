@@ -1,0 +1,27 @@
+
+
+
+
+
+* Get the mesh working for the circular cross section
+
+Not sure why your aliases disappeared. Might need to fix that
+
+
+* Get a custom solenoid working
+
+
+* Get a windtunnel with a circular crosssection in Georgia TEch
+
+That's a dud. Ask Kip if you forget.
+
+
+* Docker run command
+
+
+
+#+BEGIN_SRC bash
+
+alias dockerrun="docker run -it --mount type=bind, source=/Users/vikumar/Projects/techTrolley/meshes, target=/meshes openfoamplus/of_v1612plus_centos66 /bin/bash"
+
+#+END_SRC
